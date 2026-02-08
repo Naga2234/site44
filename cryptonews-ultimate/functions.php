@@ -21,21 +21,21 @@ function cryptonews_auto_add_tags($post_id){if(wp_is_post_revision($post_id)||wp
 add_action('save_post','cryptonews_auto_add_tags',20);
 function cryptonews_crypto_ticker(){
     $assets=array(
-        array('symbol'=>'BTC','name'=>'Bitcoin','api'=>'bitcoin'),
-        array('symbol'=>'ETH','name'=>'Ethereum','api'=>'ethereum'),
-        array('symbol'=>'USDT','name'=>'Tether','api'=>'tether'),
-        array('symbol'=>'BNB','name'=>'BNB','api'=>'binance-coin'),
-        array('symbol'=>'XRP','name'=>'XRP','api'=>'xrp'),
-        array('symbol'=>'SOL','name'=>'Solana','api'=>'solana'),
-        array('symbol'=>'ADA','name'=>'Cardano','api'=>'cardano'),
-        array('symbol'=>'DOGE','name'=>'Dogecoin','api'=>'dogecoin'),
-        array('symbol'=>'TRX','name'=>'TRON','api'=>'tron'),
-        array('symbol'=>'MATIC','name'=>'Polygon','api'=>'polygon'),
-        array('symbol'=>'DOT','name'=>'Polkadot','api'=>'polkadot'),
-        array('symbol'=>'LTC','name'=>'Litecoin','api'=>'litecoin'),
-        array('symbol'=>'SHIB','name'=>'Shiba Inu','api'=>'shiba-inu'),
-        array('symbol'=>'AVAX','name'=>'Avalanche','api'=>'avalanche'),
-        array('symbol'=>'LINK','name'=>'Chainlink','api'=>'chainlink')
+        array('symbol'=>'BTC','name'=>'Bitcoin','api'=>'bitcoin','coingecko'=>'bitcoin'),
+        array('symbol'=>'ETH','name'=>'Ethereum','api'=>'ethereum','coingecko'=>'ethereum'),
+        array('symbol'=>'USDT','name'=>'Tether','api'=>'tether','coingecko'=>'tether'),
+        array('symbol'=>'BNB','name'=>'BNB','api'=>'binance-coin','coingecko'=>'binancecoin'),
+        array('symbol'=>'XRP','name'=>'XRP','api'=>'xrp','coingecko'=>'ripple'),
+        array('symbol'=>'SOL','name'=>'Solana','api'=>'solana','coingecko'=>'solana'),
+        array('symbol'=>'ADA','name'=>'Cardano','api'=>'cardano','coingecko'=>'cardano'),
+        array('symbol'=>'DOGE','name'=>'Dogecoin','api'=>'dogecoin','coingecko'=>'dogecoin'),
+        array('symbol'=>'TRX','name'=>'TRON','api'=>'tron','coingecko'=>'tron'),
+        array('symbol'=>'MATIC','name'=>'Polygon','api'=>'polygon','coingecko'=>'matic-network'),
+        array('symbol'=>'DOT','name'=>'Polkadot','api'=>'polkadot','coingecko'=>'polkadot'),
+        array('symbol'=>'LTC','name'=>'Litecoin','api'=>'litecoin','coingecko'=>'litecoin'),
+        array('symbol'=>'SHIB','name'=>'Shiba Inu','api'=>'shiba-inu','coingecko'=>'shiba-inu'),
+        array('symbol'=>'AVAX','name'=>'Avalanche','api'=>'avalanche','coingecko'=>'avalanche-2'),
+        array('symbol'=>'LINK','name'=>'Chainlink','api'=>'chainlink','coingecko'=>'chainlink')
     );
 
     $ids=array_map(function($asset){return $asset['api'];},$assets);
@@ -43,8 +43,8 @@ function cryptonews_crypto_ticker(){
     $prices=get_transient($cache_key);
 
     if($prices===false){
-        $response=wp_remote_get('https://api.coincap.io/v2/assets?ids='.implode(',',$ids),array('timeout'=>8));
         $prices=array();
+        $response=wp_remote_get('https://api.coincap.io/v2/assets?ids='.implode(',',$ids),array('timeout'=>8));
         if(!is_wp_error($response)&&wp_remote_retrieve_response_code($response)===200){
             $body=json_decode(wp_remote_retrieve_body($response),true);
             if(isset($body['data'])&&is_array($body['data'])){
@@ -58,6 +58,40 @@ function cryptonews_crypto_ticker(){
                 }
             }
         }
+
+        $missing_assets=array();
+        $coingecko_lookup=array();
+        foreach($assets as $asset){
+            $asset_id=$asset['api'];
+            $asset_price=isset($prices[$asset_id]['price'])?$prices[$asset_id]['price']:0;
+            if($asset_price>0){
+                continue;
+            }
+            if(!empty($asset['coingecko'])){
+                $missing_assets[]=$asset['coingecko'];
+                $coingecko_lookup[$asset['coingecko']]=$asset_id;
+            }
+        }
+
+        if(!empty($missing_assets)){
+            $response=wp_remote_get('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids='.implode(',',$missing_assets),array('timeout'=>8));
+            if(!is_wp_error($response)&&wp_remote_retrieve_response_code($response)===200){
+                $body=json_decode(wp_remote_retrieve_body($response),true);
+                if(is_array($body)){
+                    foreach($body as $item){
+                        if(empty($item['id'])||!isset($coingecko_lookup[$item['id']])){
+                            continue;
+                        }
+                        $asset_id=$coingecko_lookup[$item['id']];
+                        $prices[$asset_id]=array(
+                            'price'=>isset($item['current_price'])?(float)$item['current_price']:0,
+                            'change'=>isset($item['price_change_percentage_24h'])?(float)$item['price_change_percentage_24h']:0
+                        );
+                    }
+                }
+            }
+        }
+
         if(!empty($prices)){
             set_transient($cache_key,$prices,30);
         }
