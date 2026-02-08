@@ -141,38 +141,81 @@ function initLangSwitch() {
 }
 
 // ===== ОБНОВЛЕНИЕ ЦЕН КРИПТОВАЛЮТ =====
-function updateCryptoPrices() {
-    const coins = ['bitcoin','ethereum','tether','binancecoin','ripple','solana','cardano','dogecoin','tron','matic-network','polkadot','litecoin','shiba-inu','avalanche-2','chainlink'];
-    const apiUrl = 'https://api.coingecko.com/api/v3/simple/price?ids=' + coins.join(',') + '&vs_currencies=usd&include_24hr_change=true';
+const coinCapAssets = ['bitcoin','ethereum','tether','binance-coin','xrp','solana','cardano','dogecoin','tron','polygon','polkadot','litecoin','shiba-inu','avalanche','chainlink'];
+const coinCapApiUrl = 'https://api.coincap.io/v2/assets?ids=' + coinCapAssets.join(',');
+let cryptoChangeCache = {};
+let cryptoSocket = null;
 
-    fetch(apiUrl)
+function applyTickerUpdate(cryptoId, price, change) {
+    document.querySelectorAll('.ticker-item').forEach(function(item) {
+        if (item.getAttribute('data-crypto') !== cryptoId) {
+            return;
+        }
+
+        const priceEl = item.querySelector('.price-value');
+        const changeEl = item.querySelector('.change-value');
+        const changeWrap = item.querySelector('.ticker-change');
+
+        if (priceEl && typeof price === 'number') {
+            priceEl.textContent = price < 1 ? price.toFixed(6) : price.toFixed(2);
+        }
+        if (changeEl && typeof change === 'number') {
+            changeEl.textContent = change.toFixed(2);
+        }
+        if (changeWrap && typeof change === 'number') {
+            changeWrap.classList.remove('up', 'down');
+            changeWrap.classList.add(change >= 0 ? 'up' : 'down');
+        }
+    });
+}
+
+function fetchCryptoSnapshot() {
+    fetch(coinCapApiUrl)
         .then(response => response.json())
         .then(data => {
-            document.querySelectorAll('.ticker-item').forEach(function(item) {
-                const crypto = item.getAttribute('data-crypto');
-                if (data[crypto]) {
-                    const price = data[crypto].usd;
-                    const change = data[crypto].usd_24h_change;
+            if (!data || !Array.isArray(data.data)) {
+                return;
+            }
 
-                    const priceEl = item.querySelector('.price-value');
-                    const changeEl = item.querySelector('.change-value');
-                    const changeWrap = item.querySelector('.ticker-change');
-
-                    if (priceEl) {
-                        priceEl.textContent = price < 1 ? price.toFixed(6) : price.toFixed(2);
-                    }
-                    if (changeEl) {
-                        changeEl.textContent = change.toFixed(2);
-                    }
-                    if (changeWrap) {
-                        changeWrap.classList.remove('up', 'down');
-                        changeWrap.classList.add(change >= 0 ? 'up' : 'down');
-                    }
-                }
+            data.data.forEach(function(asset) {
+                const price = parseFloat(asset.priceUsd);
+                const change = parseFloat(asset.changePercent24Hr);
+                cryptoChangeCache[asset.id] = change;
+                applyTickerUpdate(asset.id, price, change);
             });
-            console.log('Crypto prices updated');
+            console.log('Crypto prices snapshot updated');
         })
-        .catch(err => console.log('Price update error:', err));
+        .catch(err => console.log('Price snapshot error:', err));
+}
+
+function startCryptoSocket() {
+    if (!('WebSocket' in window)) {
+        return;
+    }
+
+    if (cryptoSocket) {
+        cryptoSocket.close();
+    }
+
+    cryptoSocket = new WebSocket('wss://ws.coincap.io/prices?assets=' + coinCapAssets.join(','));
+
+    cryptoSocket.onmessage = function(msg) {
+        const data = JSON.parse(msg.data);
+        Object.keys(data).forEach(function(assetId) {
+            const price = parseFloat(data[assetId]);
+            applyTickerUpdate(assetId, price, cryptoChangeCache[assetId]);
+        });
+    };
+
+    cryptoSocket.onclose = function() {
+        setTimeout(startCryptoSocket, 3000);
+    };
+}
+
+function initCryptoTicker() {
+    fetchCryptoSnapshot();
+    startCryptoSocket();
+    setInterval(fetchCryptoSnapshot, 60000);
 }
 
 // ===== РЕЙТИНГ ПОСТОВ =====
@@ -241,8 +284,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Обновляем цены криптовалют
     if (document.getElementById('cryptoTicker')) {
-        updateCryptoPrices();
-        setInterval(updateCryptoPrices, 60000); // Каждую минуту
+        initCryptoTicker();
     }
 
     // Инициализируем рейтинг (если jQuery доступен)

@@ -17,12 +17,14 @@ $cryptos=cryptonews_crypto_ticker();
 $doubled=array_merge($cryptos,$cryptos);
 foreach($doubled as $c):
 $change_num=floatval($c['change']);
+$price_value=floatval($c['price']);
+$price_decimals=$price_value<1?6:2;
 $is_up=$change_num>=0;
 ?>
 <div class="ticker-item" data-crypto="<?php echo esc_attr($c['api']);?>">
 <span class="ticker-symbol"><?php echo esc_html($c['symbol']);?></span>
-<span class="ticker-price" data-price="<?php echo esc_attr($c['price']);?>">$<span class="price-value"><?php echo esc_html(number_format(floatval($c['price']),2));?></span></span>
-<span class="ticker-change <?php echo $is_up?'up':'down';?>" data-change="<?php echo esc_attr($c['change']);?>"><span class="change-value"><?php echo esc_html($c['change']);?></span>%</span>
+<span class="ticker-price" data-price="<?php echo esc_attr($c['price']);?>">$<span class="price-value"><?php echo esc_html(number_format($price_value,$price_decimals));?></span></span>
+<span class="ticker-change <?php echo $is_up?'up':'down';?>" data-change="<?php echo esc_attr($c['change']);?>"><span class="change-value"><?php echo esc_html(number_format($change_num,2));?></span>%</span>
 </div>
 <?php endforeach;?>
 </div>

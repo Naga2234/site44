@@ -19,7 +19,57 @@ add_action('wp_ajax_vote_rating','cryptonews_vote_rating');
 add_action('wp_ajax_nopriv_vote_rating','cryptonews_vote_rating');
 function cryptonews_auto_add_tags($post_id){if(wp_is_post_revision($post_id)||wp_is_post_autosave($post_id))return;$post=get_post($post_id);if(!$post||$post->post_type!=='post')return;$content=$post->post_title.' '.$post->post_content;$content=strtolower($content);$tag_keywords=array('bitcoin'=>array('bitcoin','btc'),'crypto'=>array('crypto','cryptocurrency'),'ethereum'=>array('ethereum','eth'),'blockchain'=>array('blockchain','block chain'),'defi'=>array('defi','decentralized finance'),'nft'=>array('nft','non-fungible'),'trading'=>array('trading','trade','trader'),'altcoin'=>array('altcoin','alt coin'),'mining'=>array('mining','miner'),'web3'=>array('web3','web 3'));$tags_to_add=array();foreach($tag_keywords as $tag=>$keywords){foreach($keywords as $keyword){if(strpos($content,$keyword)!==false){$tags_to_add[]=$tag;break;}}}if(!empty($tags_to_add)){wp_set_post_tags($post_id,$tags_to_add,false);}else{wp_set_post_tags($post_id,array('crypto'),false);}}
 add_action('save_post','cryptonews_auto_add_tags',20);
-function cryptonews_crypto_ticker(){return array(array('symbol'=>'BTC','name'=>'Bitcoin','price'=>'69133.00','change'=>'-1.50','api'=>'bitcoin'),array('symbol'=>'ETH','name'=>'Ethereum','price'=>'2081.64','change'=>'-0.17','api'=>'ethereum'),array('symbol'=>'USDT','name'=>'Tether','price'=>'0.9993','change'=>'-0.02','api'=>'tether'),array('symbol'=>'BNB','name'=>'BNB','price'=>'312.45','change'=>'+2.34','api'=>'binancecoin'),array('symbol'=>'XRP','name'=>'XRP','price'=>'1.43','change'=>'+5.67','api'=>'ripple'),array('symbol'=>'SOL','name'=>'Solana','price'=>'98.23','change'=>'+8.92','api'=>'solana'),array('symbol'=>'ADA','name'=>'Cardano','price'=>'0.56','change'=>'-3.21','api'=>'cardano'),array('symbol'=>'DOGE','name'=>'Dogecoin','price'=>'0.087','change'=>'+12.45','api'=>'dogecoin'),array('symbol'=>'TRX','name'=>'TRON','price'=>'0.12','change'=>'+1.89','api'=>'tron'),array('symbol'=>'MATIC','name'=>'Polygon','price'=>'0.89','change'=>'-2.14','api'=>'matic-network'),array('symbol'=>'DOT','name'=>'Polkadot','price'=>'7.23','change'=>'+4.56','api'=>'polkadot'),array('symbol'=>'LTC','name'=>'Litecoin','price'=>'68.92','change'=>'-0.87','api'=>'litecoin'),array('symbol'=>'SHIB','name'=>'Shiba Inu','price'=>'0.000012','change'=>'+15.32','api'=>'shiba-inu'),array('symbol'=>'AVAX','name'=>'Avalanche','price'=>'36.78','change'=>'+6.23','api'=>'avalanche-2'),array('symbol'=>'LINK','name'=>'Chainlink','price'=>'14.56','change'=>'-1.23','api'=>'chainlink'));}
+function cryptonews_crypto_ticker(){
+    $assets=array(
+        array('symbol'=>'BTC','name'=>'Bitcoin','api'=>'bitcoin'),
+        array('symbol'=>'ETH','name'=>'Ethereum','api'=>'ethereum'),
+        array('symbol'=>'USDT','name'=>'Tether','api'=>'tether'),
+        array('symbol'=>'BNB','name'=>'BNB','api'=>'binance-coin'),
+        array('symbol'=>'XRP','name'=>'XRP','api'=>'xrp'),
+        array('symbol'=>'SOL','name'=>'Solana','api'=>'solana'),
+        array('symbol'=>'ADA','name'=>'Cardano','api'=>'cardano'),
+        array('symbol'=>'DOGE','name'=>'Dogecoin','api'=>'dogecoin'),
+        array('symbol'=>'TRX','name'=>'TRON','api'=>'tron'),
+        array('symbol'=>'MATIC','name'=>'Polygon','api'=>'polygon'),
+        array('symbol'=>'DOT','name'=>'Polkadot','api'=>'polkadot'),
+        array('symbol'=>'LTC','name'=>'Litecoin','api'=>'litecoin'),
+        array('symbol'=>'SHIB','name'=>'Shiba Inu','api'=>'shiba-inu'),
+        array('symbol'=>'AVAX','name'=>'Avalanche','api'=>'avalanche'),
+        array('symbol'=>'LINK','name'=>'Chainlink','api'=>'chainlink')
+    );
+
+    $ids=array_map(function($asset){return $asset['api'];},$assets);
+    $cache_key='cryptonews_ticker_prices';
+    $prices=get_transient($cache_key);
+
+    if($prices===false){
+        $response=wp_remote_get('https://api.coincap.io/v2/assets?ids='.implode(',',$ids),array('timeout'=>8));
+        $prices=array();
+        if(!is_wp_error($response)&&wp_remote_retrieve_response_code($response)===200){
+            $body=json_decode(wp_remote_retrieve_body($response),true);
+            if(isset($body['data'])&&is_array($body['data'])){
+                foreach($body['data'] as $item){
+                    if(isset($item['id'])){
+                        $prices[$item['id']]=array(
+                            'price'=>isset($item['priceUsd'])?(float)$item['priceUsd']:0,
+                            'change'=>isset($item['changePercent24Hr'])?(float)$item['changePercent24Hr']:0
+                        );
+                    }
+                }
+            }
+        }
+        set_transient($cache_key,$prices,30);
+    }
+
+    foreach($assets as &$asset){
+        $asset_data=isset($prices[$asset['api']])?$prices[$asset['api']]:array('price'=>0,'change'=>0);
+        $asset['price']=$asset_data['price'];
+        $asset['change']=$asset_data['change'];
+    }
+    unset($asset);
+
+    return $assets;
+}
 function cryptonews_hashtags(){return array(array('tag'=>'bitcoin','label'=>'#bitcoin'),array('tag'=>'crypto','label'=>'#crypto'),array('tag'=>'altcoin','label'=>'#altcoin'),array('tag'=>'ethereum','label'=>'#ethereum'),array('tag'=>'blockchain','label'=>'#blockchain'),array('tag'=>'defi','label'=>'#defi'),array('tag'=>'nft','label'=>'#nft'),array('tag'=>'trading','label'=>'#trading'),array('tag'=>'mining','label'=>'#mining'),array('tag'=>'web3','label'=>'#web3'));}
 function cryptonews_get_post_badge($post_id){$tags=get_the_tags($post_id);if($tags&&!is_wp_error($tags)){$first_tag=$tags[0];return '#'.esc_html($first_tag->name);}$cats=get_the_category($post_id);if($cats){return esc_html($cats[0]->name);}return 'News';}
 function cryptonews_pagination(){global $wp_query;$big=999999999;$pages=paginate_links(array('base'=>str_replace($big,'%#%',esc_url(get_pagenum_link($big))),'format'=>'?paged=%#%','current'=>max(1,get_query_var('paged')),'total'=>$wp_query->max_num_pages,'type'=>'array','prev_text'=>'← Prev','next_text'=>'Next →'));if(is_array($pages)){echo'<div class="pagination">';foreach($pages as $page)echo $page;echo'</div>';}}
