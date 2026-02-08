@@ -33,9 +33,32 @@ function translatePage(lang) {
         }
     });
 
-    // Контент постов и даты/время не переводим — только интерфейс
+    // Переводим контент постов
+    translatePosts(lang);
 
     console.log('Page translated to: ' + lang);
+}
+
+function translateText(text, targetLang, callback) {
+    const maxLength = 1000;
+    const textToTranslate = text.substring(0, maxLength);
+    const langMap = {'ru':'ru-RU','es':'es-ES','de':'de-DE','fr':'fr-FR'};
+    const targetCode = langMap[targetLang] || targetLang;
+    const apiUrl = 'https://api.mymemory.translated.net/get?q=' + encodeURIComponent(textToTranslate) + '&langpair=en|' + targetCode;
+
+    fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+            if (data.responseData && data.responseData.translatedText) {
+                callback(data.responseData.translatedText);
+            } else {
+                callback(text);
+            }
+        })
+        .catch(err => {
+            console.log('Translation error:', err);
+            callback(text);
+        });
 }
 
 function translateContent(text, targetLang, callback) {
@@ -60,6 +83,67 @@ function translateContent(text, targetLang, callback) {
             console.log('Translation error:', err);
             callback(text);
         });
+}
+
+function translatePosts(lang) {
+    const textSelectors = [
+        '.post-title a',
+        '.post-excerpt',
+        '.popular-link',
+        '.related-item-title',
+        '.single-title'
+    ];
+    const textEls = document.querySelectorAll(textSelectors.join(','));
+    textEls.forEach(function(el) {
+        if (!el.dataset.originalText) {
+            el.dataset.originalText = el.textContent.trim();
+        }
+        const originalText = el.dataset.originalText;
+        if (!originalText) {
+            return;
+        }
+        if (lang === 'en') {
+            el.textContent = originalText;
+            return;
+        }
+        const cacheKey = 'text:' + lang + ':' + originalText;
+        if (contentCache[cacheKey]) {
+            el.textContent = contentCache[cacheKey];
+            return;
+        }
+        translateText(originalText, lang, function(translated) {
+            const cleanText = translated.replace(/<[^>]*>/g, '').trim();
+            contentCache[cacheKey] = cleanText || originalText;
+            el.textContent = contentCache[cacheKey];
+        });
+    });
+
+    document.querySelectorAll('.single-content').forEach(function(el) {
+        if (!el.dataset.originalHtml) {
+            el.dataset.originalHtml = el.innerHTML;
+        }
+        if (!el.dataset.originalText) {
+            el.dataset.originalText = el.textContent.trim();
+        }
+        const originalHtml = el.dataset.originalHtml;
+        const originalText = el.dataset.originalText;
+        if (!originalText) {
+            return;
+        }
+        if (lang === 'en') {
+            el.innerHTML = originalHtml;
+            return;
+        }
+        const cacheKey = 'content:' + lang + ':' + originalText;
+        if (contentCache[cacheKey]) {
+            el.innerHTML = contentCache[cacheKey];
+            return;
+        }
+        translateContent(originalText, lang, function(translated) {
+            contentCache[cacheKey] = translated || originalHtml;
+            el.innerHTML = contentCache[cacheKey];
+        });
+    });
 }
 
 // ===== КНОПКА ПЕРЕКЛЮЧЕНИЯ ТЕМЫ =====
