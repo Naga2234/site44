@@ -171,12 +171,14 @@ function applyTickerUpdate(cryptoId, price, change) {
 
 function fetchCryptoSnapshot() {
     if (!coinCapApiUrl) {
+        fetchCryptoSnapshotFallback();
         return;
     }
     fetch(coinCapApiUrl)
         .then(response => response.json())
         .then(data => {
             if (!data || !Array.isArray(data.data)) {
+                fetchCryptoSnapshotFallback();
                 return;
             }
 
@@ -188,7 +190,32 @@ function fetchCryptoSnapshot() {
             });
             console.log('Crypto prices snapshot updated');
         })
-        .catch(err => console.log('Price snapshot error:', err));
+        .catch(err => {
+            console.log('Price snapshot error:', err);
+            fetchCryptoSnapshotFallback();
+        });
+}
+
+function fetchCryptoSnapshotFallback() {
+    if (typeof cryptoAjax === 'undefined' || !cryptoAjax.prices_url) {
+        return;
+    }
+    fetch(cryptoAjax.prices_url)
+        .then(response => response.json())
+        .then(data => {
+            if (!data || !data.success || !data.data || !data.data.prices) {
+                return;
+            }
+            const prices = data.data.prices;
+            Object.keys(prices).forEach(function(assetId) {
+                const price = parseFloat(prices[assetId].price);
+                const change = parseFloat(prices[assetId].change);
+                cryptoChangeCache[assetId] = change;
+                applyTickerUpdate(assetId, price, change);
+            });
+            console.log('Crypto prices fallback snapshot updated');
+        })
+        .catch(err => console.log('Fallback price snapshot error:', err));
 }
 
 function startCryptoSocket() {
