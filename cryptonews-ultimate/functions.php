@@ -3,7 +3,7 @@ function cryptonews_setup(){add_theme_support('title-tag');add_theme_support('po
 add_action('after_setup_theme','cryptonews_setup');
 function cryptonews_widgets_init(){register_sidebar(array('name'=>'Sidebar','id'=>'sidebar-1','before_widget'=>'<div class="widget">','after_widget'=>'</div>','before_title'=>'<h3 class="widget-title">','after_title'=>'</h3>'));for($i=1;$i<=4;$i++){register_sidebar(array('name'=>'Footer '.$i,'id'=>'footer-'.$i,'before_widget'=>'<div class="footer-widget">','after_widget'=>'</div>','before_title'=>'<h3>','after_title'=>'</h3>'));}}
 add_action('widgets_init','cryptonews_widgets_init');
-function cryptonews_scripts(){wp_enqueue_style('cryptonews-style',get_stylesheet_uri(),array(),'4.3.0');wp_enqueue_script('cryptonews-main',get_template_directory_uri().'/js/main.js',array('jquery'),'4.3.0',true);wp_localize_script('cryptonews-main','cryptoAjax',array('ajax_url'=>admin_url('admin-ajax.php'),'nonce'=>wp_create_nonce('crypto_vote_nonce')));}
+function cryptonews_scripts(){wp_enqueue_style('cryptonews-style',get_stylesheet_uri(),array(),'4.3.1');wp_enqueue_script('jquery');wp_enqueue_script('cryptonews-main',get_template_directory_uri().'/js/main.js',array(),'4.3.1',true);wp_localize_script('cryptonews-main','cryptoAjax',array('ajax_url'=>admin_url('admin-ajax.php'),'nonce'=>wp_create_nonce('crypto_vote_nonce'),'prices_url'=>admin_url('admin-ajax.php?action=cryptonews_prices')));}
 add_action('wp_enqueue_scripts','cryptonews_scripts');
 add_filter('excerpt_length',function(){return 20;});
 add_filter('excerpt_more',function(){return '...';});
@@ -75,6 +75,22 @@ function cryptonews_crypto_ticker(){
 
     return $assets;
 }
+function cryptonews_prices_payload(){
+    $assets=cryptonews_crypto_ticker();
+    $payload=array();
+    foreach($assets as $asset){
+        $payload[$asset['api']]=array(
+            'price'=>$asset['price'],
+            'change'=>$asset['change']
+        );
+    }
+    return $payload;
+}
+function cryptonews_prices_ajax(){
+    wp_send_json_success(array('prices'=>cryptonews_prices_payload()));
+}
+add_action('wp_ajax_cryptonews_prices','cryptonews_prices_ajax');
+add_action('wp_ajax_nopriv_cryptonews_prices','cryptonews_prices_ajax');
 function cryptonews_hashtags(){return array(array('tag'=>'bitcoin','label'=>'#bitcoin'),array('tag'=>'crypto','label'=>'#crypto'),array('tag'=>'altcoin','label'=>'#altcoin'),array('tag'=>'ethereum','label'=>'#ethereum'),array('tag'=>'blockchain','label'=>'#blockchain'),array('tag'=>'defi','label'=>'#defi'),array('tag'=>'nft','label'=>'#nft'),array('tag'=>'trading','label'=>'#trading'),array('tag'=>'mining','label'=>'#mining'),array('tag'=>'web3','label'=>'#web3'));}
 function cryptonews_get_post_badge($post_id){$tags=get_the_tags($post_id);if($tags&&!is_wp_error($tags)){$first_tag=$tags[0];return '#'.esc_html($first_tag->name);}$cats=get_the_category($post_id);if($cats){return esc_html($cats[0]->name);}return 'News';}
 function cryptonews_pagination(){global $wp_query;$big=999999999;$pages=paginate_links(array('base'=>str_replace($big,'%#%',esc_url(get_pagenum_link($big))),'format'=>'?paged=%#%','current'=>max(1,get_query_var('paged')),'total'=>$wp_query->max_num_pages,'type'=>'array','prev_text'=>'← Prev','next_text'=>'Next →'));if(is_array($pages)){echo'<div class="pagination">';foreach($pages as $page)echo $page;echo'</div>';}}
