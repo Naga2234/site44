@@ -273,7 +273,7 @@ function initCardAnimation() {
 }
 
 // ===== ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ =====
-document.addEventListener('DOMContentLoaded', function() {
+function initCryptoNews() {
     // Инициализируем все функции
     initThemeToggle();
     initLangSwitch();
@@ -295,4 +295,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     console.log('CryptoNews v4.3 initialized');
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCryptoNews);
+} else {
+    initCryptoNews();
+}
