@@ -58,15 +58,20 @@ function cryptonews_crypto_ticker(){
                 }
             }
         }
-        set_transient($cache_key,$prices,30);
+        if(!empty($prices)){
+            set_transient($cache_key,$prices,30);
+        }
     }
 
-    foreach($assets as &$asset){
-        $asset_data=isset($prices[$asset['api']])?$prices[$asset['api']]:array('price'=>0,'change'=>0);
-        $asset['price']=$asset_data['price'];
-        $asset['change']=$asset_data['change'];
+    if(!is_array($prices)){
+        $prices=array();
     }
-    unset($asset);
+
+    foreach($assets as $index=>$asset){
+        $asset_data=isset($prices[$asset['api']])?$prices[$asset['api']]:array('price'=>0,'change'=>0);
+        $assets[$index]['price']=$asset_data['price'];
+        $assets[$index]['change']=$asset_data['change'];
+    }
 
     return $assets;
 }

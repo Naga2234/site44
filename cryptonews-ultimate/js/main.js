@@ -141,8 +141,8 @@ function initLangSwitch() {
 }
 
 // ===== ОБНОВЛЕНИЕ ЦЕН КРИПТОВАЛЮТ =====
-const coinCapAssets = ['bitcoin','ethereum','tether','binance-coin','xrp','solana','cardano','dogecoin','tron','polygon','polkadot','litecoin','shiba-inu','avalanche','chainlink'];
-const coinCapApiUrl = 'https://api.coincap.io/v2/assets?ids=' + coinCapAssets.join(',');
+let coinCapAssets = [];
+let coinCapApiUrl = '';
 let cryptoChangeCache = {};
 let cryptoSocket = null;
 
@@ -170,6 +170,9 @@ function applyTickerUpdate(cryptoId, price, change) {
 }
 
 function fetchCryptoSnapshot() {
+    if (!coinCapApiUrl) {
+        return;
+    }
     fetch(coinCapApiUrl)
         .then(response => response.json())
         .then(data => {
@@ -193,6 +196,10 @@ function startCryptoSocket() {
         return;
     }
 
+    if (!coinCapAssets.length) {
+        return;
+    }
+
     if (cryptoSocket) {
         cryptoSocket.close();
     }
@@ -213,6 +220,18 @@ function startCryptoSocket() {
 }
 
 function initCryptoTicker() {
+    const uniqueAssets = new Set();
+    document.querySelectorAll('.ticker-item').forEach(function(item) {
+        const assetId = item.getAttribute('data-crypto');
+        if (assetId) {
+            uniqueAssets.add(assetId);
+        }
+    });
+    coinCapAssets = Array.from(uniqueAssets);
+    if (!coinCapAssets.length) {
+        return;
+    }
+    coinCapApiUrl = 'https://api.coincap.io/v2/assets?ids=' + coinCapAssets.join(',');
     fetchCryptoSnapshot();
     startCryptoSocket();
     setInterval(fetchCryptoSnapshot, 60000);
