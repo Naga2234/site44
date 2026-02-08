@@ -1,21 +1,64 @@
 <?php get_header();?>
 <main class="site-main">
 <div class="container">
-<?php if(have_posts()):while(have_posts()):the_post();?>
-<article <?php post_class();?>>
-<header class="single-header">
+<?php if(have_posts()):while(have_posts()):the_post();
+$word_count=str_word_count(wp_strip_all_tags(get_the_content()));
+$reading_time=max(1,ceil($word_count/200));
+$categories=get_the_category();
+?>
+<article <?php post_class('single-article');?>>
+<section class="single-hero">
+<div class="single-hero-content">
+<a class="single-back" href="<?php echo esc_url(home_url('/'));?>">← <span data-translate="back_to_news">Back to news</span></a>
 <h1 class="single-title"><?php the_title();?></h1>
+<?php if(has_excerpt()):?>
+<p class="single-subtitle"><?php echo esc_html(get_the_excerpt());?></p>
+<?php endif;?>
 <div class="single-meta">
-<span>📅 <span class="post-date" data-date="<?php echo get_the_date('d.m.Y');?>"><?php echo get_the_date('d.m.Y');?></span></span>
-<span>🕐 <span class="post-time"><?php echo get_the_time('H:i');?></span></span>
-<span>👁️ <span class="view-count"><?php echo cryptonews_get_views(get_the_ID());?></span> <span data-translate="views">views</span></span>
+<span class="meta-chip">📅 <span class="post-date" data-date="<?php echo get_the_date('d.m.Y');?>"><?php echo get_the_date('d.m.Y');?></span></span>
+<span class="meta-chip">🕐 <span class="post-time"><?php echo get_the_time('H:i');?></span></span>
+<span class="meta-chip">⏱ <?php echo esc_html($reading_time);?> min</span>
+<span class="meta-chip">👁️ <span class="view-count"><?php echo cryptonews_get_views(get_the_ID());?></span> <span data-translate="views">views</span></span>
 <?php cryptonews_display_rating(get_the_ID(),true);?>
 </div>
-</header>
-<?php if(has_post_thumbnail()):?>
-<div class="single-thumbnail"><?php the_post_thumbnail('full');?></div>
+<?php if($categories):?>
+<div class="single-tags">
+<?php foreach($categories as $category):?>
+<a class="single-tag" href="<?php echo esc_url(get_category_link($category->term_id));?>"><?php echo esc_html($category->name);?></a>
+<?php endforeach;?>
+</div>
 <?php endif;?>
+</div>
+<?php if(has_post_thumbnail()):?>
+<div class="single-hero-media"><?php the_post_thumbnail('full');?></div>
+<?php endif;?>
+</section>
+<div class="single-layout">
+<div class="single-content-wrap">
 <div class="single-content" id="postContent" data-original-lang="en"><?php the_content();?></div>
+</div>
+<aside class="single-aside">
+<div class="single-aside-card">
+<h3 class="single-aside-title" data-translate="article_stats">Article stats</h3>
+<ul class="single-stats">
+<li><span data-translate="published">Published</span> <strong><?php echo get_the_date('d.m.Y');?></strong></li>
+<li><span data-translate="time">Time</span> <strong><?php echo get_the_time('H:i');?></strong></li>
+<li><span data-translate="reading_time">Reading time</span> <strong><?php echo esc_html($reading_time);?> min</strong></li>
+<li><span data-translate="views">Views</span> <strong><?php echo cryptonews_get_views(get_the_ID());?></strong></li>
+</ul>
+</div>
+<?php if($categories):?>
+<div class="single-aside-card">
+<h3 class="single-aside-title" data-translate="topics">Topics</h3>
+<div class="single-tags">
+<?php foreach($categories as $category):?>
+<a class="single-tag" href="<?php echo esc_url(get_category_link($category->term_id));?>"><?php echo esc_html($category->name);?></a>
+<?php endforeach;?>
+</div>
+</div>
+<?php endif;?>
+</aside>
+</div>
 </article>
 <?php cryptonews_social_share();?>
 <?php
